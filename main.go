@@ -8,8 +8,6 @@ import (
 	"log"
 	"net/http"
 
-	b64 "encoding/base64"
-
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/client-go/dynamic"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -37,47 +35,13 @@ func healthHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func indexHandler(w http.ResponseWriter, r *http.Request) {
-	u, p := GetBasicAuthCredentials()
+	u, p := utils.GetBasicAuthCredentials()
 
 	tmpl := template.Must(template.ParseFiles("static/index.tpl"))
 	tmpl.Execute(w, struct {
 		Username string
 		Password string
 	}{Username: u, Password: p})
-
-}
-
-func GetBasicAuthCredentials() (string, string) {
-
-	config := ctrl.GetConfigOrDie()
-	dynamic := dynamic.NewForConfigOrDie(config)
-	log.Println("Fetching credentials")
-	cm, err := utils.GetSecret(dynamic)
-
-	if err != nil {
-		log.Println(err)
-		return "", ""
-	}
-
-	cred, found, err := unstructured.NestedStringMap(cm.UnstructuredContent(), "data")
-	if err != nil || !found {
-		log.Println("Error fetching credentials", err)
-		return "", ""
-	}
-
-	u, err := b64.StdEncoding.DecodeString(cred["user"])
-	if err != nil {
-		log.Println("Error Decode username", err)
-		return "", ""
-	}
-
-	p, err := b64.StdEncoding.DecodeString(cred["password"])
-	if err != nil {
-		log.Println("Error Decode password", err)
-		return "", ""
-	}
-
-	return string(u), string(p)
 
 }
 
@@ -149,7 +113,7 @@ func CORSMiddleware(next http.Handler) http.Handler {
 
 func main() {
 
-	u, p := GetBasicAuthCredentials()
+	u, p := utils.GetBasicAuthCredentials()
 	mux := http.NewServeMux()
 	mux.Handle("/", http.HandlerFunc(indexHandler))
 	mux.Handle("/status", CORSMiddleware(basicAuth(http.HandlerFunc(statusHandler), u, p)))
